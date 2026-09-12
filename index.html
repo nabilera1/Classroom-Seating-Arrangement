@@ -345,6 +345,12 @@
   @keyframes fadeInUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 
   footer{text-align:center;color:rgba(255,255,255,0.75);font-size:11.5px;margin-top:30px;}
+  .school-input{
+    background:transparent;border:none;border-bottom:1px dashed rgba(255,255,255,0.5);
+    color:rgba(255,255,255,0.9);font-size:11.5px;font-family:inherit;font-weight:600;
+    text-align:center;width:150px;padding:1px 2px;
+  }
+  .school-input:focus{outline:none;border-bottom-color:#fff;}
 
   /* ===== PRINT : 자리 배치도(+명언, 학년/반)만 인쇄 ===== */
   @media print{
@@ -414,7 +420,7 @@
         <button class="btn btn-secondary" id="orderBtn">🔢 번호 순서대로</button>
         <button class="btn btn-ghost" id="resetBtn">↺ 자리 초기화</button>
       </div>
-      <div class="hint no-print">💡 자리 두 곳을 순서대로 클릭하면 서로 자리를 맞바꿀 수 있어요. 각 자리에는 <b>자리 번호</b>(왼쪽 위)와 <b>학생 번호</b>(오른쪽 위, 색상 배지)가 함께 표시돼요. 자리 수는 오른쪽 명렬에서 <b>이름이 입력된 마지막 번호</b>까지 자동으로 맞춰져요 (중간에 빠진 번호는 전학·자퇴 등으로 보고 빈 자리로 남아요).</div>
+      <div class="hint no-print">💡 자리 두 곳을 순서대로 클릭하면 서로 자리를 맞바꿀 수 있어요. 각 자리에는 <b>자리 번호</b>(왼쪽 위)와 <b>학생 번호</b>(오른쪽 위, 색상 배지)가 함께 표시돼요. 자리 수는 오른쪽 명렬에서 <b>이름이 입력된 마지막 번호</b>까지 자동으로 맞춰져요 (중간에 빠진 번호는 전학·자퇴 등으로 보고 빈 자리로 남아요). 이름 뒤에 <b>0~9</b> 숫자를 붙이면 같은 숫자끼리 랜덤 배치 시 짝(같은 책상)이 되고, <b>11~99</b> 숫자를 붙이면 같은 숫자끼리 서로 떨어져 앉아요. (예: 홍길동1 / 유관순1 → 짝, 김철수11 / 노영심11 → 분리)</div>
 
       <div class="seat-chart" id="seatChart"></div>
       <div class="front-note">⬆ 뒤쪽 &nbsp;·&nbsp; 앞쪽(칠판 방향) ⬇</div>
@@ -442,13 +448,13 @@
         <button class="btn btn-ghost" id="clearRosterBtn">🗑️ 전체 지우기</button>
       </div>
       <input type="file" id="fileInput" accept=".txt,text/plain" style="display:none">
-      <div class="upload-hint">한 줄에 이름 하나씩 적힌 .txt 파일 (최대 30명, 앞 번호는 자동 제거)</div>
+      <div class="upload-hint">한 줄에 이름 하나씩 적힌 .txt 파일 (최대 30명, 앞 번호는 자동 제거) · 이름 뒤 0~9는 짝, 11~99는 분리 태그로 인식돼요</div>
       <div class="roster-list" id="rosterList"></div>
     </div>
 
   </div>
 
-  <footer>© 교실 자리 배치 프로그램 · 김해수남고등학교</footer>
+  <footer class="no-print">© 교실 자리 배치 프로그램 · <input id="schoolNameInput" class="school-input" type="text" value="김해수남고등학교" maxlength="30"></footer>
 </div>
 
 <div id="toast"></div>
@@ -502,6 +508,104 @@
       if(roster[i-1] && roster[i-1].trim() !== '') return i;
     }
     return 0;
+  }
+
+  // 이름 끝에 붙은 숫자를 짝/분리 태그로 해석합니다.
+  // 0~9: 같은 숫자를 가진 학생끼리 짝(같은 책상)으로 배치
+  // 11~99: 같은 숫자를 가진 학생끼리 같은 책상에 배치되지 않도록 함
+  // 10은 규칙에 해당하지 않아 일반 학생으로 취급합니다. 이름 표시 자체는 바뀌지 않습니다.
+  function parseTag(name){
+    const m = String(name||'').trim().match(/(\d{1,2})$/);
+    if(!m) return null;
+    const n = parseInt(m[1],10);
+    if(n>=0 && n<=9) return {type:'pair', tag:n};
+    if(n>=11 && n<=99) return {type:'avoid', tag:n};
+    return null;
+  }
+
+  // 짝/분리 규칙을 지키면서 학생 번호를 자리(좌석)에 배치합니다.
+  // 좌석은 (2d-1, 2d) 형태의 2인 책상 단위로 묶여 있다는 점을 이용합니다.
+  function buildConstrainedAssignment(){
+    const students = [];
+    for(let i=1;i<=seatTotal;i++){
+      const nm = roster[i-1];
+      if(nm && nm.trim()){
+        students.push({num:i, name:nm, tag:parseTag(nm)});
+      }
+    }
+
+    // 1) pair(0~9) 태그가 정확히 2명인 그룹은 하나의 '짝 블록'으로 묶습니다.
+    const pairGroups = {};
+    students.forEach(s=>{
+      if(s.tag && s.tag.type==='pair'){
+        (pairGroups[s.tag.tag] = pairGroups[s.tag.tag] || []).push(s);
+      }
+    });
+    const usedNums = new Set();
+    const blocks = [];
+    Object.values(pairGroups).forEach(group=>{
+      if(group.length === 2){
+        blocks.push(group);
+        usedNums.add(group[0].num);
+        usedNums.add(group[1].num);
+      }
+      // 인원이 1명이거나 3명 이상이면 정확히 짝을 지을 수 없으므로 일반 학생으로 처리합니다.
+    });
+    let individuals = students.filter(s=>!usedNums.has(s.num));
+
+    const deskCount = Math.floor(seatTotal/2);
+    const hasLeftover = seatTotal % 2 === 1;
+    const leftoverSeat = hasLeftover ? seatTotal : null;
+
+    // 책상보다 짝 블록이 많으면 넘치는 블록은 일반 학생 풀로 되돌립니다.
+    let usableBlocks = blocks;
+    if(blocks.length > deskCount){
+      usableBlocks = shuffleArray(blocks).slice(0, deskCount);
+      const usedSet = new Set();
+      usableBlocks.forEach(b=>{ usedSet.add(b[0].num); usedSet.add(b[1].num); });
+      individuals = students.filter(s=>!usedSet.has(s.num));
+    }
+
+    const newAssignments = Array(SEAT_COUNT+1).fill(0);
+    const deskOrder = shuffleArray(Array.from({length:deskCount}, (_,i)=>i+1));
+    let deskIdx = 0;
+
+    shuffleArray(usableBlocks).forEach(pair=>{
+      const d = deskOrder[deskIdx++];
+      const seatA = 2*d-1, seatB = 2*d;
+      const [s1,s2] = Math.random()<0.5 ? pair : [pair[1],pair[0]];
+      newAssignments[seatA] = s1.num;
+      newAssignments[seatB] = s2.num;
+    });
+
+    // 2) 남은 학생들은 분리(11~99) 태그를 피해서 남은 책상에 2명씩 채웁니다.
+    const queue = shuffleArray(individuals);
+    const remainingDesks = deskOrder.slice(deskIdx);
+    remainingDesks.forEach(d=>{
+      if(queue.length === 0) return;
+      const first = queue.shift();
+      const seatA = 2*d-1, seatB = 2*d;
+      if(queue.length === 0){
+        newAssignments[seatA] = first.num;
+        return;
+      }
+      let partnerIdx = queue.findIndex(cand=>{
+        const conflict = first.tag && first.tag.type==='avoid' && cand.tag && cand.tag.type==='avoid' && cand.tag.tag === first.tag.tag;
+        return !conflict;
+      });
+      if(partnerIdx === -1) partnerIdx = 0; // 모두 충돌하면 어쩔 수 없이 배치 (드문 경우)
+      const second = queue.splice(partnerIdx,1)[0];
+      const seated = Math.random()<0.5 ? [first,second] : [second,first];
+      newAssignments[seatA] = seated[0].num;
+      newAssignments[seatB] = seated[1].num;
+    });
+
+    // 3) 홀수 좌석이 있으면 남은 학생 한 명을 마지막 자리에 배치합니다.
+    if(leftoverSeat && queue.length > 0){
+      newAssignments[leftoverSeat] = queue.shift().num;
+    }
+
+    return newAssignments;
   }
 
   // ---------- 명언 ----------
@@ -764,11 +868,7 @@
     if(seatTotal === 0){ toast('먼저 오른쪽에서 학생 명렬을 입력해주세요! 📋'); return; }
     const studentNums = roster.map((n,i)=> n && n.trim() ? i+1 : null).filter(Boolean);
     if(studentNums.length === 0){ toast('먼저 오른쪽에서 학생 명렬을 입력해주세요! 📋'); return; }
-    const shuffled = shuffleArray(studentNums);
-    const newAssignments = Array(SEAT_COUNT+1).fill(0);
-    for(let i=0;i<Math.min(shuffled.length, seatTotal); i++){
-      newAssignments[i+1] = shuffled[i];
-    }
+    const newAssignments = buildConstrainedAssignment();
     animateAssign(newAssignments, true);
   });
 
@@ -833,17 +933,20 @@
     });
   });
 
-  // ---------- 학년 / 반 ----------
+  // ---------- 학년 / 반 / 학교명 ----------
   const gradeInput = document.getElementById('gradeInput');
   const classNumInput = document.getElementById('classNumInput');
+  const schoolNameInput = document.getElementById('schoolNameInput');
   const gcPrintLine = document.getElementById('gcPrintLine');
   function updateGcLine(){
     const g = gradeInput.value || '?';
     const c = classNumInput.value || '?';
-    gcPrintLine.textContent = `${g}학년 ${c}반`;
+    const school = schoolNameInput.value.trim();
+    gcPrintLine.textContent = (school ? school + ' · ' : '') + `${g}학년 ${c}반`;
   }
   gradeInput.addEventListener('input', updateGcLine);
   classNumInput.addEventListener('input', updateGcLine);
+  schoolNameInput.addEventListener('input', updateGcLine);
   updateGcLine();
 
   printBtn.addEventListener('click', ()=>{
