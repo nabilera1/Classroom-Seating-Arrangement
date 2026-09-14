@@ -236,6 +236,18 @@
     text-align:center;
   }
   .desk-label.empty-slot{visibility:hidden;}
+  .desk-toggle{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    margin:10px 0 0;font-size:12.5px;color:#8a8a9a;
+  }
+  .desk-toggle-btn{
+    border:1.5px solid var(--line);background:#fff;color:#8a8a9a;
+    border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;
+    cursor:pointer;transition:all .15s ease;
+  }
+  .desk-toggle-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .desk-toggle-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .desk-toggle-btn:disabled{opacity:0.5;cursor:not-allowed;}
   .seat-ghost{width:76px;height:80px;visibility:hidden;}
   .seat-chart-empty{
     width:100%;text-align:center;color:#b2b0c9;
@@ -424,6 +436,11 @@
 
       <div class="seat-chart" id="seatChart"></div>
       <div class="front-note">⬆ 뒤쪽 &nbsp;·&nbsp; 앞쪽(칠판 방향) ⬇</div>
+      <div class="desk-toggle no-print">
+        🪑 교사 책상 위치
+        <button class="desk-toggle-btn" id="deskLeftBtn">◀ 왼쪽</button>
+        <button class="desk-toggle-btn" id="deskRightBtn">오른쪽 ▶</button>
+      </div>
 
       <div class="confirm-zone">
         <div class="confirm-banner" id="confirmBanner"></div>
@@ -473,7 +490,10 @@
 <script>
 (function(){
   const SEAT_COUNT = 30; // 명렬 최대 인원 (자리 그리드는 아래 seatTotal로 동적 계산)
-  const GROUP_LABELS = ['교사 책상','교탁',''];
+  let deskSide = 'left'; // '교사 책상' 위치: 'left' 또는 'right' (교탁은 항상 가운데)
+  function currentGroupLabels(){
+    return deskSide === 'left' ? ['교사 책상','교탁',''] : ['','교탁','교사 책상'];
+  }
 
   const quotes = [
     ["The best way to predict the future is to create it.","Abraham Lincoln"],
@@ -779,13 +799,14 @@
         }
       }
     }
+    const labels = currentGroupLabels();
     for(let gi=0; gi<3; gi++){
       const groupEl = document.createElement('div');
       groupEl.className = 'seat-group';
       groupEl.appendChild(groupRowsEls[gi]);
       const label = document.createElement('div');
-      label.className = 'desk-label' + (GROUP_LABELS[gi] ? '' : ' empty-slot');
-      label.textContent = GROUP_LABELS[gi] || '-';
+      label.className = 'desk-label' + (labels[gi] ? '' : ' empty-slot');
+      label.textContent = labels[gi] || '-';
       groupEl.appendChild(label);
       seatChart.appendChild(groupEl);
     }
@@ -916,6 +937,24 @@
     toast('좌석을 초기화했어요');
   });
 
+  // ---------- 교사 책상 위치 (왼쪽/오른쪽) ----------
+  const deskLeftBtn = document.getElementById('deskLeftBtn');
+  const deskRightBtn = document.getElementById('deskRightBtn');
+  function updateDeskToggleUI(){
+    deskLeftBtn.classList.toggle('active', deskSide==='left');
+    deskRightBtn.classList.toggle('active', deskSide==='right');
+  }
+  function setDeskSide(side){
+    if(locked || deskSide===side) return;
+    deskSide = side;
+    updateDeskToggleUI();
+    buildSeatChart();
+    renderSeatsInstant();
+  }
+  deskLeftBtn.addEventListener('click', ()=>setDeskSide('left'));
+  deskRightBtn.addEventListener('click', ()=>setDeskSide('right'));
+  updateDeskToggleUI();
+
   // ---------- 담임 선생님 성함 ----------
   const teacherNameInput = document.getElementById('teacherNameInput');
   const teacherNameDisplay = document.getElementById('teacherNameDisplay');
@@ -942,6 +981,8 @@
       printBtn.style.display = 'inline-flex';
       unlockBtn.style.display = 'inline-block';
       teacherNameInput.disabled = true;
+      deskLeftBtn.disabled = true;
+      deskRightBtn.disabled = true;
       renderRoster();
       renderSeatsInstant();
       toast('최종 확인이 완료되었습니다 ✅');
@@ -956,6 +997,8 @@
       unlockBtn.style.display = 'none';
       finalConfirmBtn.style.display = 'inline-flex';
       teacherNameInput.disabled = false;
+      deskLeftBtn.disabled = false;
+      deskRightBtn.disabled = false;
       renderRoster();
       renderSeatsInstant();
       toast('잠금을 해제했어요');
