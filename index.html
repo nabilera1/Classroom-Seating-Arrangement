@@ -665,16 +665,48 @@
     }
   }
 
-  function applyRosterNames(names){
-    roster = Array(SEAT_COUNT).fill('');
+  // .txt 내용을 줄 단위 이름 배열로 변환 (맨 앞 목록 번호 표기는 제거)
+  function parseTxtLines(text){
+    return String(text||'').split(/\r?\n/)
+      .map(l=>l.replace(/^\s*\d+\s*[.).\-:]?\s*/,'').trim())
+      .filter(l=>l!=='');
+  }
+
+  // 이름 배열을 실제 명렬에 반영. source에 따라 안내 문구만 다르게 표시합니다.
+  function loadNamesIntoRoster(names, source){
     const trimmed = names.map(n=>n.trim()).filter(n=>n!=='');
+    if(trimmed.length === 0) return false;
+    roster = Array(SEAT_COUNT).fill('');
     const overflow = trimmed.length > SEAT_COUNT;
     for(let i=0;i<Math.min(trimmed.length, SEAT_COUNT); i++){ roster[i] = trimmed[i]; }
     renderRoster();
     refreshChart();
-    toast(overflow
-      ? `${SEAT_COUNT}명까지만 불러왔어요 (파일에 ${trimmed.length}명 있음)`
-      : `${trimmed.length}명의 이름을 불러왔어요 ✨`);
+    if(source === 'auto'){
+      toast(overflow
+        ? `학생명렬.txt에서 ${SEAT_COUNT}명까지만 자동으로 불러왔어요`
+        : `학생명렬.txt를 자동으로 불러왔어요 ✨ (${trimmed.length}명)`);
+    } else {
+      toast(overflow
+        ? `${SEAT_COUNT}명까지만 불러왔어요 (파일에 ${trimmed.length}명 있음)`
+        : `${trimmed.length}명의 이름을 불러왔어요 ✨`);
+    }
+    return true;
+  }
+  function applyRosterNames(names){
+    loadNamesIntoRoster(names, 'manual');
+  }
+
+  // 페이지와 같은 위치에 '학생명렬.txt' 파일이 있으면 시작할 때 자동으로 불러옵니다.
+  // 파일이 없거나(404), file://로 직접 열어 fetch가 막힌 경우에는 조용히 무시하고 현재 상태를 그대로 둡니다.
+  function tryAutoLoadRosterFile(){
+    if(typeof fetch !== 'function') return;
+    fetch('학생명렬.txt', {cache:'no-store'})
+      .then(res=>{ if(!res.ok) throw new Error('not found'); return res.text(); })
+      .then(text=>{
+        const lines = parseTxtLines(text);
+        if(lines.length) loadNamesIntoRoster(lines, 'auto');
+      })
+      .catch(()=>{ /* 파일이 없으면 기존 상태 유지 */ });
   }
 
   document.getElementById('uploadBtn').addEventListener('click', ()=>{
@@ -686,10 +718,7 @@
     if(!file) return;
     const reader = new FileReader();
     reader.onload = evt=>{
-      const text = String(evt.target.result || '');
-      const lines = text.split(/\r?\n/)
-        .map(l=>l.replace(/^\s*\d+\s*[.).\-:]?\s*/,'').trim())
-        .filter(l=>l!=='');
+      const lines = parseTxtLines(String(evt.target.result || ''));
       if(lines.length === 0){ toast('파일에서 이름을 찾지 못했어요 😥'); return; }
       applyRosterNames(lines);
     };
@@ -958,6 +987,7 @@
   // ---------- 초기화 ----------
   renderRoster();
   refreshChart();
+  tryAutoLoadRosterFile();
 })();
 </script>
 
