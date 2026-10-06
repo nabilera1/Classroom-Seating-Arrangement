@@ -182,6 +182,21 @@
   .btn-ghost{background:#fff0ee;color:var(--warn);}
   .btn-print{background:linear-gradient(135deg,#00b894,#00cec9);color:#fff;box-shadow:0 6px 16px rgba(0,184,148,0.35);}
   .hint{font-size:12.5px;color:#8a8a9a;margin:-8px 0 16px;}
+  .usage-notes{
+    max-width:720px;margin:18px auto 0;
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.25);
+    border-radius:14px;
+    padding:16px 22px;
+    color:rgba(255,255,255,0.85);
+    font-size:12px;
+    line-height:1.7;
+  }
+  .usage-notes strong{display:block;margin-bottom:8px;color:#fff;font-size:13px;}
+  .usage-notes ol{margin:0;padding-left:20px;}
+  .usage-notes li{margin-bottom:5px;}
+  .usage-notes li:last-child{margin-bottom:0;}
+  .usage-notes b{color:#fff;}
 
   .seat-chart{
     display:flex;
@@ -192,6 +207,10 @@
   }
   .seat-group{display:flex;flex-direction:column;align-items:center;gap:14px;}
   .seat-rows{display:grid;grid-template-columns:repeat(2,76px);gap:9px;}
+  /* 좌우 반전: 그룹 순서(교사 책상/교탁 위치)와 각 줄 안의 좌/우 자리 순서를 화면상에서만 뒤집습니다 (글자는 그대로, 위치만 반전) */
+  .seat-chart.mirrored{flex-direction:row-reverse;}
+  .seat-rows.mirrored{direction:rtl;}
+  .seat-rows.mirrored .seat{direction:ltr;}
   .seat{
     width:76px;height:80px;
     border-radius:12px;
@@ -248,6 +267,10 @@
   .desk-toggle-btn:hover{border-color:var(--accent);color:var(--accent);}
   .desk-toggle-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
   .desk-toggle-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .mirror-toggle{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    margin:8px 0 0;font-size:12.5px;color:#8a8a9a;text-align:center;
+  }
   .seat-ghost{width:76px;height:80px;visibility:hidden;}
   .seat-chart-empty{
     width:100%;text-align:center;color:#b2b0c9;
@@ -353,6 +376,14 @@
   .modal-box p{font-size:13.5px;color:#666;line-height:1.5;margin-bottom:20px;}
   .modal-btns{display:flex;gap:10px;}
   .modal-btns .btn{flex:1;justify-content:center;}
+  .assign-field{text-align:left;margin-bottom:14px;}
+  .assign-field label{font-size:12.5px;color:#666;display:block;margin-bottom:4px;font-weight:600;}
+  .assign-select{
+    width:100%;border:1.5px solid var(--line);border-radius:9px;
+    padding:8px 10px;font-size:13.5px;font-family:inherit;color:var(--ink);
+    background:#fff;
+  }
+  .assign-select:focus{outline:none;border-color:var(--accent);}
 
   @keyframes fadeInUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 
@@ -430,16 +461,18 @@
       <div class="toolbar no-print">
         <button class="btn btn-primary" id="shuffleBtn">🎲 랜덤으로 섞기</button>
         <button class="btn btn-secondary" id="orderBtn">🔢 번호 순서대로</button>
+        <button class="btn btn-secondary" id="directAssignBtn">🔄 자리 교환</button>
         <button class="btn btn-ghost" id="resetBtn">↺ 자리 초기화</button>
       </div>
-      <div class="hint no-print">💡 자리 두 곳을 순서대로 클릭하면 서로 자리를 맞바꿀 수 있어요. 각 자리에는 <b>자리 번호</b>(왼쪽 위)와 <b>학생 번호</b>(오른쪽 위, 색상 배지)가 함께 표시돼요. 자리 수는 오른쪽 명렬에서 <b>이름이 입력된 마지막 번호</b>까지 자동으로 맞춰져요 (중간에 빠진 번호는 전학·자퇴 등으로 보고 빈 자리로 남아요). 이름 뒤에 <b>0~9</b> 숫자를 붙이면 같은 숫자끼리 랜덤 배치 시 짝(같은 책상)이 되고, <b>11~99</b> 숫자를 붙이면 같은 숫자끼리 서로 떨어져 앉아요. (예: 홍길동1 / 유관순1 → 짝, 김철수11 / 노영심11 → 분리)</div>
-
       <div class="seat-chart" id="seatChart"></div>
       <div class="front-note">⬆ 뒤쪽 &nbsp;·&nbsp; 앞쪽(칠판 방향) ⬇</div>
       <div class="desk-toggle no-print">
         🪑 교사 책상 위치
         <button class="desk-toggle-btn" id="deskLeftBtn">◀ 왼쪽</button>
         <button class="desk-toggle-btn" id="deskRightBtn">오른쪽 ▶</button>
+      </div>
+      <div class="mirror-toggle no-print">
+        <button class="desk-toggle-btn" id="mirrorBtn" title="학생이 교실 앞에서 교사를 바라보는 방향 기준으로 화면을 좌우로 뒤집어요">↔️ 좌우 반전 (학생이 보는 방향)</button>
       </div>
 
       <div class="confirm-zone">
@@ -472,6 +505,19 @@
   </div>
 
   <footer class="no-print">© 교실 자리 배치 프로그램 · <input id="schoolNameInput" class="school-input" type="text" value="김해수남고등학교" maxlength="30"></footer>
+
+  <div class="usage-notes no-print">
+    <strong>ℹ️ 사용 안내</strong>
+    <ol>
+      <li>자리 두 곳을 순서대로 클릭하면 서로 자리를 맞바꿀 수 있어요.</li>
+      <li>각 자리에는 <b>자리 번호</b>(왼쪽 위)와 <b>학생 번호</b>(오른쪽 위, 색상 배지)가 함께 표시돼요.</li>
+      <li>자리 수는 오른쪽 명렬에서 <b>이름이 입력된 마지막 번호</b>까지 자동으로 맞춰져요 (중간에 빠진 번호는 전학·자퇴 등으로 보고 빈 자리로 남아요).</li>
+      <li>이름 뒤에 <b>0~9</b> 숫자를 붙이면 같은 숫자끼리 랜덤 배치 시 짝(같은 책상)이 되고, <b>11~99</b> 숫자를 붙이면 같은 숫자끼리 서로 떨어져 앉아요. (예: 홍길동1 / 유관순1 → 짝, 김철수11 / 노영심11 → 분리)</li>
+      <li>이름 뒤에 붙인 숫자는 배치 계산에만 사용되고, 명렬 목록·자리표·인쇄물에는 표시되지 않아요. (명렬 입력칸을 클릭해 수정할 때만 숫자가 보여요)</li>
+      <li><b>🔄 자리 교환</b> 버튼으로 원하는 학생을 원하는 자리에 바로 지정해 교환할 수 있어요.</li>
+      <li><b>↔️ 좌우 반전</b> 버튼을 누르면 교사가 보는 방향 기준이 아니라, 학생이 교실 앞을 바라볼 때 보이는 방향 기준으로 화면이 좌우로 뒤집혀요.</li>
+    </ol>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -487,10 +533,28 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="assignOverlay">
+  <div class="modal-box">
+    <h3>🔄 자리 교환</h3>
+    <p>원하는 자리 번호와 학생을 선택하면 바로 그 자리로 교환 배치돼요.</p>
+    <div class="assign-field">
+      <label for="assignSeatSelect">자리 번호</label>
+      <select id="assignSeatSelect" class="assign-select"></select>
+      <label for="assignStudentSelect" style="margin-top:10px;">배치할 학생</label>
+      <select id="assignStudentSelect" class="assign-select"></select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" id="assignCancelBtn">취소</button>
+      <button class="btn btn-primary" id="assignOkBtn">배치하기</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   const SEAT_COUNT = 30; // 명렬 최대 인원 (자리 그리드는 아래 seatTotal로 동적 계산)
   let deskSide = 'left'; // '교사 책상' 위치: 'left' 또는 'right' (교탁은 항상 가운데)
+  let mirrored = false; // 화면 좌우 반전 여부 (교사 시점 ↔ 학생이 교실 앞을 바라볼 때의 시점). 자리 번호·데이터는 그대로, 화면 표시 위치만 뒤집힙니다.
   function currentGroupLabels(){
     return deskSide === 'left' ? ['교사 책상','교탁',''] : ['','교탁','교사 책상'];
   }
@@ -514,6 +578,13 @@
     ["Where there is unity there is always victory.","Publilius Syrus"],
   ];
 
+  // 첫 화면 기본값: 한국사 속 유명한 인물 30명 (학생명렬.txt가 없을 때 자동으로 채워져 자리까지 미리 배치됩니다)
+  const KOREAN_HISTORY_NAMES = [
+    "세종대왕","이순신","유관순","안중근","김구","신사임당","정약용","장영실","이황","이이",
+    "강감찬","을지문덕","광개토대왕","선덕여왕","계백","최영","문익점","허준","황희","윤봉길",
+    "안창호","홍범도","전봉준","김옥균","서재필","나혜석","한용운","주시경","방정환","왕건"
+  ];
+
   // seatAssignments[좌석번호] = 학생 번호(1~30) 또는 0(빈 자리)
   // 학생 번호와 이름은 항상 roster[학생번호-1]에서 함께 조회되므로 이름이 바뀌어도 자리에 그대로 반영됩니다.
   let seatAssignments = Array(SEAT_COUNT+1).fill(0);
@@ -533,7 +604,8 @@
   // 이름 끝에 붙은 숫자를 짝/분리 태그로 해석합니다.
   // 0~9: 같은 숫자를 가진 학생끼리 짝(같은 책상)으로 배치
   // 11~99: 같은 숫자를 가진 학생끼리 같은 책상에 배치되지 않도록 함
-  // 10은 규칙에 해당하지 않아 일반 학생으로 취급합니다. 이름 표시 자체는 바뀌지 않습니다.
+  // 10은 규칙에 해당하지 않아 일반 학생으로 취급합니다.
+  // 명렬 입력칸에는 입력한 그대로(숫자 포함) 표시되지만, 실제 자리표에는 숫자를 뺀 이름만 보여줍니다 (stripTag 참고).
   function parseTag(name){
     const m = String(name||'').trim().match(/(\d{1,2})$/);
     if(!m) return null;
@@ -541,6 +613,16 @@
     if(n>=0 && n<=9) return {type:'pair', tag:n};
     if(n>=11 && n<=99) return {type:'avoid', tag:n};
     return null;
+  }
+
+  // 자리표에 표시할 이름: 인식된 짝/분리 태그 숫자는 제거하고 실제 이름만 남깁니다.
+  function stripTag(name){
+    const raw = String(name||'').trim();
+    const m = raw.match(/(\d{1,2})$/);
+    if(!m) return raw;
+    const n = parseInt(m[1],10);
+    if(!((n>=0 && n<=9) || (n>=11 && n<=99))) return raw; // 10처럼 규칙에 해당하지 않으면 그대로 둠
+    return raw.slice(0, raw.length - m[1].length).trim();
   }
 
   // 짝/분리 규칙을 지키면서 학생 번호를 자리(좌석)에 배치합니다.
@@ -678,9 +760,13 @@
       row.className = 'roster-row';
       row.innerHTML = `<div class="rnum">${i}</div><input type="text" placeholder="이름 입력" maxlength="10" data-idx="${i-1}">`;
       const input = row.querySelector('input');
-      input.value = roster[i-1];
+      // 기본 표시는 짝/분리 태그 숫자를 뺀 깨끗한 이름만 보여줍니다 (학생들이 태그를 알아챌 수 없도록).
+      // 입력칸을 눌러 수정할 때만 태그 숫자가 포함된 원본 텍스트가 보여서 선생님이 태그를 확인/수정할 수 있습니다.
+      input.value = stripTag(roster[i-1]);
       input.disabled = locked;
+      input.addEventListener('focus', e=>{ e.target.value = roster[i-1]; });
       input.addEventListener('input', e=>{ roster[i-1] = e.target.value; refreshChart(); });
+      input.addEventListener('blur', e=>{ roster[i-1] = e.target.value; e.target.value = stripTag(roster[i-1]); });
       rosterList.appendChild(row);
     }
   }
@@ -729,6 +815,16 @@
       .catch(()=>{ /* 파일이 없으면 기존 상태 유지 */ });
   }
 
+  // 첫 화면 기본 상태: 한국사 속 유명한 인물 30명으로 명렬을 채우고, 번호 순서대로 자리까지 미리 배치해 둡니다.
+  // (바로 뒤 tryAutoLoadRosterFile()에서 실제 학생명렬.txt가 발견되면 이 기본값은 그 내용으로 자동 교체됩니다.)
+  function loadDefaultHistoricalRoster(){
+    roster = KOREAN_HISTORY_NAMES.slice(0, SEAT_COUNT);
+    renderRoster();
+    refreshChart();
+    for(let i=1;i<=SEAT_COUNT;i++){ seatAssignments[i] = i; }
+    renderSeatsInstant();
+  }
+
   document.getElementById('uploadBtn').addEventListener('click', ()=>{
     if(locked) return;
     document.getElementById('fileInput').click();
@@ -769,6 +865,7 @@
   function buildSeatChart(){
     seatChart.innerHTML = '';
     selectedSeat = null;
+    seatChart.classList.toggle('mirrored', mirrored);
     if(seatTotal === 0){
       const empty = document.createElement('div');
       empty.className = 'seat-chart-empty';
@@ -778,7 +875,7 @@
     }
     const rowCount = Math.ceil(seatTotal/6);
     const groupRowsEls = [document.createElement('div'), document.createElement('div'), document.createElement('div')];
-    groupRowsEls.forEach(w=>w.className='seat-rows');
+    groupRowsEls.forEach(w=>{ w.className = 'seat-rows' + (mirrored ? ' mirrored' : ''); });
     for(let r=rowCount;r>=1;r--){
       const start = (r-1)*6+1;
       for(let gi=0; gi<3; gi++){
@@ -824,10 +921,10 @@
     const filled = seatTotal ? seatAssignments.slice(1, seatTotal+1).filter(n=>n).length : 0;
     document.getElementById('statBadge').textContent = `배치 완료 ${filled} / ${seatTotal}명`;
   }
-  // 좌석에 표시할 학생 번호+이름을 함께 조회 (항상 같이 이동)
+  // 좌석에 표시할 학생 번호+이름을 함께 조회 (항상 같이 이동, 짝/분리 태그 숫자는 숨김)
   function studentDisplay(studentNum){
     if(!studentNum) return {stu:'', name:'-', has:false};
-    const nm = (roster[studentNum-1] || '').trim();
+    const nm = stripTag(roster[studentNum-1] || '');
     return {stu:studentNum, name: nm ? nm : '(이름없음)', has:true};
   }
   function renderSeatsInstant(){
@@ -863,6 +960,72 @@
       setTimeout(()=>seatEl.classList.remove('landed'),350);
     }
   }
+
+  // ---------- 자리 교환 (자리 번호 + 학생을 직접 선택해 배치) ----------
+  // 특정 학생을 특정 자리에 직접 배치합니다. 그 학생이 이미 다른 자리에 있었다면 원래 그 자리에 있던 학생과 맞교환되고,
+  // 새로 들어오는 학생이 없었다면(빈 자리 선택 등) 원래 그 자리에 있던 학생은 빈 자리가 됩니다.
+  function assignStudentToSeat(seatNum, studentNum){
+    let oldSeatOfStudent = 0;
+    if(studentNum){
+      for(let s=1;s<=seatTotal;s++){
+        if(seatAssignments[s] === studentNum){ oldSeatOfStudent = s; break; }
+      }
+    }
+    const oldOccupant = seatAssignments[seatNum] || 0;
+    seatAssignments[seatNum] = studentNum;
+    if(studentNum && oldSeatOfStudent && oldSeatOfStudent !== seatNum){
+      seatAssignments[oldSeatOfStudent] = oldOccupant;
+    }
+    renderSeatsInstant();
+  }
+
+  const directAssignBtn = document.getElementById('directAssignBtn');
+  const assignOverlay = document.getElementById('assignOverlay');
+  const assignSeatSelect = document.getElementById('assignSeatSelect');
+  const assignStudentSelect = document.getElementById('assignStudentSelect');
+  const assignOkBtn = document.getElementById('assignOkBtn');
+  const assignCancelBtn = document.getElementById('assignCancelBtn');
+
+  function openAssignModal(){
+    if(locked || animating) return;
+    if(seatTotal === 0){ toast('먼저 오른쪽에서 학생 명렬을 입력해주세요! 📋'); return; }
+    assignSeatSelect.innerHTML = '';
+    for(let s=1;s<=seatTotal;s++){
+      const cur = seatAssignments[s];
+      const curName = cur ? stripTag(roster[cur-1]||'') : '';
+      const opt = document.createElement('option');
+      opt.value = String(s);
+      opt.textContent = `자리 ${s}번` + (curName ? ` (현재: ${curName})` : ' (빈 자리)');
+      assignSeatSelect.appendChild(opt);
+    }
+    assignStudentSelect.innerHTML = '';
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '0';
+    emptyOpt.textContent = '— 빈 자리로 두기 —';
+    assignStudentSelect.appendChild(emptyOpt);
+    for(let i=1;i<=seatTotal;i++){
+      const nm = roster[i-1];
+      if(nm && nm.trim()){
+        const seatOfThis = seatAssignments.indexOf(i);
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = `${i}번 ${stripTag(nm)}` + (seatOfThis > 0 ? ` (현재 ${seatOfThis}번 자리)` : '');
+        assignStudentSelect.appendChild(opt);
+      }
+    }
+    assignOverlay.classList.add('show');
+  }
+  directAssignBtn.addEventListener('click', openAssignModal);
+  assignCancelBtn.addEventListener('click', ()=> assignOverlay.classList.remove('show'));
+  assignOkBtn.addEventListener('click', ()=>{
+    const seatNum = parseInt(assignSeatSelect.value, 10);
+    const studentNum = parseInt(assignStudentSelect.value, 10) || 0;
+    assignStudentToSeat(seatNum, studentNum);
+    assignOverlay.classList.remove('show');
+    const seatEl = document.querySelector(`.seat[data-seat="${seatNum}"]`);
+    if(seatEl){ seatEl.classList.add('landed'); setTimeout(()=>seatEl.classList.remove('landed'), 350); }
+    toast('자리를 교환했어요 🔄');
+  });
 
   function shuffleArray(arr){
     const a = arr.slice();
@@ -955,6 +1118,22 @@
   deskRightBtn.addEventListener('click', ()=>setDeskSide('right'));
   updateDeskToggleUI();
 
+  // ---------- 화면 좌우 반전 (학생이 교실 앞에서 바라보는 방향 기준) ----------
+  // 교사가 교실 뒤(또는 화면 앞)에서 보는 방향과, 학생이 자리에서 앞(교탁)을 보는 방향은 좌우가 반대입니다.
+  // 이 버튼은 자리 번호·배치 데이터는 바꾸지 않고, 화면에 보이는 좌/우 위치만 뒤집어 보여줍니다. (잠금 여부와 무관하게 항상 사용 가능)
+  const mirrorBtn = document.getElementById('mirrorBtn');
+  function updateMirrorUI(){
+    mirrorBtn.classList.toggle('active', mirrored);
+  }
+  mirrorBtn.addEventListener('click', ()=>{
+    mirrored = !mirrored;
+    updateMirrorUI();
+    buildSeatChart();
+    renderSeatsInstant();
+    toast(mirrored ? '화면을 좌우로 반전했어요 ↔️' : '원래 방향으로 되돌렸어요');
+  });
+  updateMirrorUI();
+
   // ---------- 담임 선생님 성함 ----------
   const teacherNameInput = document.getElementById('teacherNameInput');
   const teacherNameDisplay = document.getElementById('teacherNameDisplay');
@@ -983,6 +1162,7 @@
       teacherNameInput.disabled = true;
       deskLeftBtn.disabled = true;
       deskRightBtn.disabled = true;
+      directAssignBtn.disabled = true;
       renderRoster();
       renderSeatsInstant();
       toast('최종 확인이 완료되었습니다 ✅');
@@ -999,6 +1179,7 @@
       teacherNameInput.disabled = false;
       deskLeftBtn.disabled = false;
       deskRightBtn.disabled = false;
+      directAssignBtn.disabled = false;
       renderRoster();
       renderSeatsInstant();
       toast('잠금을 해제했어요');
@@ -1028,8 +1209,7 @@
   });
 
   // ---------- 초기화 ----------
-  renderRoster();
-  refreshChart();
+  loadDefaultHistoricalRoster();
   tryAutoLoadRosterFile();
 })();
 </script>
